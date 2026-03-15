@@ -1,6 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import litellm
 from dotenv import load_dotenv
+import inspect
 
 load_dotenv()
 
@@ -67,3 +68,38 @@ class LLMHandler:
                 return response.choices[0].message.content
             except Exception as e:
                 raise RuntimeError(f"API call failed: {e}") from e
+
+class CodeTester:
+    def __init__(self, code, instance):
+        self.code = code
+        self.instance = instance
+
+    def test(self):
+        iso_namespace = {}
+        try:
+            byte_code = compile(self.code, '<string>', 'exec')
+            exec(byte_code, iso_namespace)
+            
+            if 'main' not in iso_namespace:
+                return "Error: main function wasn't generated."
+            
+            generated_function = iso_namespace['main']
+            
+            sig = inspect.signature(generated_function)
+            if len(sig.parameters) == 0:
+                return "Error: 'the algorithm should have  an input parameter at least"
+
+            result = generated_function(self.instance)
+            
+            if isinstance(result, (list, tuple)) and len(result) > 1:
+                return result
+            return result
+            
+        except Exception as e:
+            return f"Error in generated code: {type(e).__name__}: {e}"
+
+
+        
+
+
+        
