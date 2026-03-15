@@ -75,6 +75,8 @@ class CodeTester:
         self.instance = instance
 
     def test(self):
+        #TODO : add timeout for the execution of the code
+
         iso_namespace = {}
         try:
             byte_code = compile(self.code, '<string>', 'exec')
