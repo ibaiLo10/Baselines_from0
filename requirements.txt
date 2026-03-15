@@ -1,0 +1,20 @@
+# --- Core & Utils ---
+python-dotenv>=1.0.1      
+requests>=2.32.0          
+tqdm>=4.67.0             
+
+# --- LLM APIs ---
+anthropic>=0.84.0         # Claude
+google-genai>=1.0.0       # Gemini 
+openai>=1.60.0            # DeepSeek 
+reka-api>=2.1.0           # Reka AI 
+
+# --- Hugging Face & Local Inference ---
+huggingface-hub>=1.6.0    
+transformers>=4.50.0      
+accelerate>=1.3.0        
+tokenizers>=0.21.0        
+bitsandbytes>=0.45.0      
+
+# --- use the same interface for all APIs ---
+litellm>=1.60.0           # TODO for the future
