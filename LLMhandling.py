@@ -34,7 +34,7 @@ class LLMHandler:
             >>> handler = LLMHandler(
             ...     mode="api",
             ...     model_name="gpt-4o",
-            ...     model_args={"temperature": 0.2}
+            ...     model_args={"temperature": 0.8}
             ... )
             >>> response = handler.get_response("Write a binary search function in Python.")
     """
@@ -62,6 +62,23 @@ class LLMHandler:
 
         else:
             raise ValueError(f"Unknown mode: {mode!r}. Use 'local' or 'api'.")
+    
+    def apply_template(self, prompt: str, template_path: str) -> str:
+        with open(template_path, 'r') as f:
+            template_content = f.read()
+
+        prompt = f"""
+                You are an expert algorithm designer, your task is to design and create an algorithm to resolve LOP instances.
+                The algorithm should be efficient and well-optimized, and it shhould be implemented in Python. The aim of the algorithm
+                is to be able to compete if not surpass existing algorithms in terms of solution quality.
+
+                Here is the template you should follow for your response:
+
+                {template_content}
+
+                """
+        return prompt
+
 
     def get_response(self, prompt_text: str) -> str:
         """
@@ -76,13 +93,13 @@ class LLMHandler:
         Raises:
             RuntimeError: If the API call fails.
         """
-        messages = [{"role": "user", "content": prompt_text}]
+        messages = [{"role": "user", "content": self.apply_template(prompt_text, template_path="template.py")}]
 
         try:
             response = completion(
                 model=self.model_name,
                 messages=messages,
-                temperature=self.model_args.get("temperature", 0.2),
+                temperature=self.model_args.get("temperature", 0.8),
                 max_tokens=self.model_args.get("max_new_tokens", 4096),
                 api_base=self.api_base
             )
