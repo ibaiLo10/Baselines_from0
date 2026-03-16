@@ -11,10 +11,12 @@ reka-api>=2.1.0           # Reka AI
 
 # --- Hugging Face & Local Inference ---
 huggingface-hub>=1.6.0    
-transformers>=4.50.0      
-accelerate>=1.3.0        
 tokenizers>=0.21.0        
-bitsandbytes>=0.45.0      
 
-# --- use the same interface for all APIs ---
-litellm>=1.60.0           # TODO for the future
+# --- Unified API interface ---
+litellm>=1.60.0
+
+# --- Local Inference (GPU required) ---
+# Install manually if running in local mode:
+# pip install vllm
+vllm>=0.8.5

@@ -7,30 +7,30 @@ load_dotenv()
 
 class LLMHandler:
     """
-    A unified handler for LLM inference supporting local (vLLM) and API (litellm) modes.
+    A unified handler for LLM inference supporting:
+    - Local vLLM server (OpenAI-compatible API)
+    - Remote API providers via litellm
 
     Args:
-        mode (str): 'local' for vLLM inference, 'api' for litellm API calls.
-        model_name (str): HuggingFace model ID for local mode (e.g. 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8')
-                          or litellm model string for API mode (e.g. 'gpt-4o', 'anthropic/claude-3-5-sonnet').
+        mode (str): 'local' for a local vLLM server, 'api' for external APIs.
+        model_name (str): Model name (HF model for vLLM server or API model name).
         model_args (dict | None): Optional configuration dict. Supported keys:
             - temperature (float): Sampling temperature. Default: 0.2.
-            - max_new_tokens (int): Maximum tokens to generate. Default: 4096. (local only)
-
-    Raises:
-        ValueError: If model_name is not provided or mode is invalid.
-        ImportError: If vllm is not installed and mode is 'local'.
+            - max_new_tokens (int): Maximum tokens to generate. Default: 4096.
+        api_base (str | None): Base URL for local vLLM server (default: http://localhost:8000/v1).
 
     Examples:
-        Local usage (requires vllm and a GPU):
+
+        Local usage (vLLM server running):
             >>> handler = LLMHandler(
             ...     mode="local",
-            ...     model_name="Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8",
-            ...     model_args={"temperature": 0.2, "max_new_tokens": 4096}
+            ...     model_name="meta-llama/Meta-Llama-3-8B-Instruct",
+            ...     api_base="http://localhost:8000/v1",
+            ...     model_args={"temperature": 0.2}
             ... )
             >>> response = handler.get_response("Write a binary search function in Python.")
 
-        API usage (requires appropriate API key in .env):
+        API usage:
             >>> handler = LLMHandler(
             ...     mode="api",
             ...     model_name="gpt-4o",
@@ -39,7 +39,13 @@ class LLMHandler:
             >>> response = handler.get_response("Write a binary search function in Python.")
     """
 
-    def __init__(self, mode: str = "local", model_name: str | None = None, model_args: dict | None = None):
+    def __init__(
+        self,
+        mode: str = "local",
+        model_name: str | None = None,
+        model_args: dict | None = None,
+        api_base: str | None = None,
+    ):
         if model_name is None:
             raise ValueError("model_name is required.")
 
@@ -47,19 +53,12 @@ class LLMHandler:
         self.model_name = model_name
         self.model_args = model_args or {}
 
-        if mode == 'local':
-            try:
-                from vllm import LLM, SamplingParams
-                self._SamplingParams = SamplingParams
-            except ImportError:
-                raise ImportError(
-                    "vllm is required for local mode. "
-                    "Install it with: pip install vllm"
-                )
-            self.model = LLM(model=model_name)
+        if mode == "local":
 
-        elif mode == 'api':
-            self.api_model = model_name
+            self.api_base = api_base or "http://localhost:8000/v1"
+
+        elif mode == "api":
+            self.api_base = api_base
 
         else:
             raise ValueError(f"Unknown mode: {mode!r}. Use 'local' or 'api'.")
@@ -75,28 +74,23 @@ class LLMHandler:
             str: The model's generated response.
 
         Raises:
-            RuntimeError: If the API call fails in 'api' mode.
+            RuntimeError: If the API call fails.
         """
         messages = [{"role": "user", "content": prompt_text}]
 
-        if self.mode == 'local':
-            sampling_params = self._SamplingParams(
-                temperature=self.model_args.get('temperature', 0.2),
-                max_tokens=self.model_args.get('max_new_tokens', 4096),
+        try:
+            response = completion(
+                model=self.model_name,
+                messages=messages,
+                temperature=self.model_args.get("temperature", 0.2),
+                max_tokens=self.model_args.get("max_new_tokens", 4096),
+                api_base=self.api_base
             )
-            outputs = self.model.chat(messages, sampling_params=sampling_params)
-            return outputs[0].outputs[0].text
 
-        elif self.mode == 'api':
-            try:
-                response = completion(
-                    model=self.api_model,
-                    messages=messages,
-                    temperature=self.model_args.get('temperature', 0.2)
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                raise RuntimeError(f"API call failed: {e}") from e
+            return response.choices[0].message.content
+
+        except Exception as e:
+            raise RuntimeError(f"LLM call failed: {e}") from e
 
 
 class CodeTester:
@@ -119,15 +113,25 @@ class CodeTester:
 
     def _run_code(self, queue: multiprocessing.Queue, code: str):
         iso_namespace = {}
+        if code.strip().startswith("```"):
+            code = code.strip()
+            code = code.split("```")
+            if len(code) >= 2:
+                code = code[1]
+            code = code.replace("python", "", 1).strip()
+
         try:
-            byte_code = compile(code, '<string>', 'exec')
+            byte_code = compile(code, "<string>", "exec")
             exec(byte_code, iso_namespace)
-            if 'main' not in iso_namespace:
+
+            if "main" not in iso_namespace:
                 queue.put("Error: main function wasn't generated.")
                 return
-            generated_function = iso_namespace['main']
+
+            generated_function = iso_namespace["main"]
             result = generated_function(self.instance)
             queue.put(result)
+
         except Exception as e:
             queue.put(f"Error in generated code: {type(e).__name__}: {e}")
 
@@ -142,7 +146,10 @@ class CodeTester:
             str: The result returned by 'main', or an error message.
         """
         queue = multiprocessing.Queue()
-        process = multiprocessing.Process(target=self._run_code, args=(queue, code))
+        process = multiprocessing.Process(
+            target=self._run_code, args=(queue, code)
+        )
+
         process.start()
         process.join(self.timeout)
 
