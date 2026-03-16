@@ -2,6 +2,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import litellm
 from dotenv import load_dotenv
 import inspect
+import multiprocessing
 
 load_dotenv()
 
@@ -69,36 +70,44 @@ class LLMHandler:
             except Exception as e:
                 raise RuntimeError(f"API call failed: {e}") from e
 
+
+
 class CodeTester:
-    def __init__(self, code, instance):
+    def __init__(self, code, instance, timeout=5):
         self.code = code
         self.instance = instance
+        self.timeout = timeout
 
-    def test(self):
-        #TODO : add timeout for the execution of the code
-
+    def _run_code(self, queue):
         iso_namespace = {}
         try:
             byte_code = compile(self.code, '<string>', 'exec')
             exec(byte_code, iso_namespace)
             
             if 'main' not in iso_namespace:
-                return "Error: main function wasn't generated."
+                queue.put("Error: main function wasn't generated.")
+                return
             
             generated_function = iso_namespace['main']
-            
-            sig = inspect.signature(generated_function)
-            if len(sig.parameters) == 0:
-                return "Error: 'the algorithm should have  an input parameter at least"
-
             result = generated_function(self.instance)
-            
-            if isinstance(result, (list, tuple)) and len(result) > 1:
-                return result
-            return result
+            queue.put(result)
             
         except Exception as e:
-            return f"Error in generated code: {type(e).__name__}: {e}"
+            queue.put(f"Error in generated code: {type(e).__name__}: {e}")
+
+    def test(self):
+        queue = multiprocessing.Queue()
+        process = multiprocessing.Process(target=self._run_code, args=(queue,))
+        
+        process.start()
+        process.join(self.timeout)
+
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            return f"Error: Execution timed out after {self.timeout} seconds."
+
+        return queue.get() if not queue.empty() else "Error: No result returned."
 
 
         
