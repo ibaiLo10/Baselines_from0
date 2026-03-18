@@ -23,7 +23,8 @@ if __name__ == "__main__":
     }
     LOPInstance = np.randint(0,100, (100, 100))
     handler = LLMhandling.LLMHandler(mode='local', model_name=model, model_args=model_args)
-    tester = LLMhandling.LLMTester(instance = LOPInstance, timeout = 300)
+    tester = LLMhandling.CodeTester(instance = LOPInstance, timeout = 300)
+
     
 
 
