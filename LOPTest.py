@@ -2,7 +2,7 @@ import numpy as np
 
 import LLMhandling
 
-def fitness_function(solution, LOPInstance):
+def fitness_function(solution, lop_instance):
 
     total_fitness = 0
     n = len(solution)
@@ -11,7 +11,7 @@ def fitness_function(solution, LOPInstance):
         for j in range(i + 1, n):
             u = solution[i]
             v = solution[j]
-            total_fitness += LOPInstance[u][v]        
+            total_fitness += lop_instance[u][v]
     return total_fitness
 
 

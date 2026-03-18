@@ -26,7 +26,7 @@ class LLMHandler:
             ...     mode="local",
             ...     model_name="meta-llama/Meta-Llama-3-8B-Instruct",
             ...     api_base="http://localhost:8000/v1",
-            ...     model_args={"temperature": 0.2}
+            ...     model_args={"temperature": 0.8}
             ... )
             >>> response = handler.get_response("Write a binary search function in Python.")
 
