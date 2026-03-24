@@ -2,6 +2,8 @@
 python-dotenv>=1.0.1      
 requests>=2.32.0          
 tqdm>=4.67.0             
+numpy>=1.26.0
+pandas>=2.2.0
 
 # --- LLM APIs ---
 anthropic>=0.84.0         # Claude
@@ -17,6 +19,4 @@ tokenizers>=0.21.0
 litellm>=1.60.0
 
 # --- Local Inference (GPU required) ---
-# Install manually if running in local mode:
-# pip install vllm
-vllm>=0.8.5
+#Galdetu Joseri vllminstalatuta dagoen ala ez eta nola egin.
