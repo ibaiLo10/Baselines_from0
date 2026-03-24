@@ -4,6 +4,7 @@ import time
 import requests
 import LLMhandling
 
+
 def start_vllm_server(model: str, port: int = 8000):
     process = subprocess.Popen(
         [
@@ -23,11 +24,11 @@ def start_vllm_server(model: str, port: int = 8000):
             time.sleep(5)
     raise RuntimeError("vLLM server did not start in time.")
 
-def fitness_function(solution, lop_instance):
 
+def fitness_function(solution, lop_instance):
     total_fitness = 0
     n = len(solution)
-    
+
     for i in range(n):
         for j in range(i + 1, n):
             u = solution[i]
@@ -38,17 +39,17 @@ def fitness_function(solution, lop_instance):
 
 if __name__ == "__main__":
     model = 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8'
-    model_args ={
-    "temperature": 0.8,
-    "max_new_tokens": 2500
+    model_args = {
+        "temperature": 0.8,
+        "max_new_tokens": 2500
     }
     port = 14001
     base = f"http://localhost:{port}"
-    LOPInstance = np.randint(0,100, (100, 100))
+    LOPInstance = np.random.randint(0, 100, (100, 100))
     server = start_vllm_server(model, )
     try:
         handler = LLMhandling.LLMHandler(mode='local', model_name=model, model_args=model_args, api_base=base)
-        tester = LLMhandling.CodeTester(instance = LOPInstance, timeout = 300)
+        tester = LLMhandling.CodeTester(instance=LOPInstance, timeout=300)
         code = None
         fitness_list = []
         for i in range(100):
@@ -56,5 +57,3 @@ if __name__ == "__main__":
             test = tester.test(code)
     finally:
         server.terminate()
-
-
