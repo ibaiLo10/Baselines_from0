@@ -17,7 +17,7 @@ def main(instance):
      a permutation for the given LOP instance.
     ·The only thing to change is the TODO part, the rest should remain the same.
      Including parameters and return.
-    ·The input parameter "instance" is a np.array of size nxn, n being the length of the solution.
+    ·The input parameter "instance" is a np.array of size nxn, n being the number of rows and columns.
     """
     #TODO: implement the algorithm here.
 
