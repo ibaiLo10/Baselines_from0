@@ -2,6 +2,9 @@ from litellm import completion
 from dotenv import load_dotenv
 import multiprocessing
 import re
+import time
+import requests
+import subprocess
 import traceback
 from dataclasses import dataclass
 from typing import Any
@@ -248,3 +251,22 @@ class CodeTester:
             )
 
         return TestResult(**queue.get_nowait())
+
+    def start_vllm_server(model: str, port: int = 8000):
+        process = subprocess.Popen(
+            [
+                "python", "-m", "vllm.entrypoints.openai.api_server",
+                "--model", model,
+                "--port", str(port),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for _ in range(60):
+            try:
+                requests.get(f"http://localhost:{port}/health")
+                print("Server ready.")
+                return process
+            except requests.ConnectionError:
+                time.sleep(5)
+        raise RuntimeError("vLLM server did not start in time.")

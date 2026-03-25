@@ -3,13 +3,10 @@ Import every library needed for the algorithm to be designed before
 starting to implement the code. The imports must be added in the
 specified field.
 """
-
-
 def main(instance):
     #Imports start
 
     #Imports end
-
     solution = None
     """
     ·Every helper function must be implemented inside main() function.
@@ -20,11 +17,6 @@ def main(instance):
     ·The input parameter "instance" is a np.array of size nxn, n being the number of rows and columns.
     """
     #TODO: implement the algorithm here.
-
-
-
-
-
 
     #END TODO
     return solution

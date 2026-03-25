@@ -6,35 +6,6 @@ import LLMhandling
 import pandas as pd
 import os
 
-def start_vllm_server(model: str, port: int = 8000):
-    process = subprocess.Popen(
-        [
-            "python", "-m", "vllm.entrypoints.openai.api_server",
-            "--model", model,
-            "--port", str(port),
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    for _ in range(60):
-        try:
-            requests.get(f"http://localhost:{port}/health")
-            print("Server ready.")
-            return process
-        except requests.ConnectionError:
-            time.sleep(5)
-    raise RuntimeError("vLLM server did not start in time.")
-
-
-def fitness_function(solution, lop_instance):
-    total_fitness = 0
-    n = len(solution)
-    for i in range(n):
-        for j in range(i + 1, n):
-            u = solution[i]
-            v = solution[j]
-            total_fitness += lop_instance[u][v]
-    return total_fitness
 
 
 if __name__ == "__main__":
@@ -58,7 +29,7 @@ if __name__ == "__main__":
     efficient and practical for instances of size n=100. Aim for the highest solution quality possible.
     """
 
-    server = start_vllm_server(model, port)
+    server = LLMhandling.start_vllm_server(model, port)
     records = []
 
     try:
@@ -95,7 +66,7 @@ if __name__ == "__main__":
                 result = tester.test(code)
 
                 if result.success:
-                    fitness = fitness_function(result.solution, instance)
+                    fitness = LOPbasics.fitness_function(result.solution, instance)
                 else:
                     fitness = None
 
