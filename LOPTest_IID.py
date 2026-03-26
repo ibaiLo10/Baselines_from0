@@ -43,17 +43,24 @@ if __name__ == "__main__":
                 tester = LLMhandling.CodeTester(instance=instance, timeout=300)
                 result = tester.test(code)
 
-                if result.success:
-                    fitness = LOPbasics.fitness_function(result.solution, instance)
-                else:
-                    fitness = None
+                n = instance.shape[0]
+                is_valid = (
+                        result.success and
+                        isinstance(result.solution, list) and
+                        len(result.solution) == n and
+                        all(isinstance(x, (int, np.integer)) for x in result.solution) and
+                        len(set(result.solution)) == n and
+                        set(result.solution) == set(range(n))
+                )
+                fitness = LOPbasics.fitness_function(result.solution, instance) if is_valid else None
 
                 records.append({
                     "algorithm_id": algorithm_id,
                     "instance_id": j,
                     "fitness": fitness,
-                    "success": result.success,
-                    "error_type": result.error_type,
+                    "success": is_valid,
+                    "error_type": result.error_type if not result.success else (
+                        None if is_valid else "invalid_solution"),
                 })
 
     finally:
