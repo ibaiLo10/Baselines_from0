@@ -1,17 +1,15 @@
 import numpy as np
-import subprocess
-import time
-import requests
 import LLMhandling
 import pandas as pd
 import os
 
-
+import LOPbasics
 
 if __name__ == "__main__":
     np.random.seed(42)
-    instances = [np.random.randint(0, 100, (100, 100)) for _ in range(100)]
-
+    INSTANCE_NUM = 2
+    NUM_GENERATIONS = 100
+    instances = [np.random.randint(0, 100, (100, 100)) for _ in range(INSTANCE_NUM)]
     model = 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8'
     model_args = {
         "temperature": 0.8,
@@ -35,7 +33,7 @@ if __name__ == "__main__":
     try:
         handler = LLMhandling.LLMHandler(mode='local', model_name=model, model_args=model_args, api_base=base)
         os.makedirs("algorithms", exist_ok=True)
-        for i in range(100):
+        for i in range(NUM_GENERATIONS):
             algorithm_id = f"algorithm_{i}"
             if i==0:
                 code = handler.get_response(template_path="./template.py", prompt=prompt)
@@ -48,7 +46,7 @@ if __name__ == "__main__":
                 containing each integer from 0 to n-1 exactly once. The algorithm should be computationally
                 efficient and practical for instances of size n=100. Aim for the highest solution quality possible.
                 The last code created by an LLM got these results on 100 different instances:
-                {records[i*100-1:(i+1)*100-1]}
+                {records[i*INSTANCE_NUM-1:(i+1)*INSTANCE_NUM-1]}
                 algorithm_id = the algorithm id which is the same for all 100.
                 instance_id = the id of the instance
                 fitness = the fitness of the instance

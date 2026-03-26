@@ -1,15 +1,15 @@
 import numpy as np
-import subprocess
-import time
-import requests
 import LLMhandling
 import pandas as pd
 import os
 
+import LOPbasics
+
 if __name__ == "__main__":
     np.random.seed(42)
-    instances = [np.random.randint(0, 100, (100, 100)) for _ in range(100)]
-
+    INSTANCE_NUM = 2
+    NUM_GENERATIONS = 100
+    instances = [np.random.randint(0, 100, (100, 100)) for _ in range(INSTANCE_NUM)]
     model = 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8'
     model_args = {
         "temperature": 0.8,
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     try:
         handler = LLMhandling.LLMHandler(mode='local', model_name=model, model_args=model_args, api_base=base)
         os.makedirs("algorithms", exist_ok=True)
-        for i in range(100):
+        for i in range(NUM_GENERATIONS):
             algorithm_id = f"algorithm_{i}"
             code = handler.get_response(template_path="./template.py", prompt=prompt)
             with open(f"algorithms/{algorithm_id}.py", "w") as f:
