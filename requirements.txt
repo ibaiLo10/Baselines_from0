@@ -1,22 +1,22 @@
 # --- Core & Utils ---
-python-dotenv>=1.0.1      
-requests>=2.32.0          
-tqdm>=4.67.0             
+python-dotenv>=1.0.1
+requests>=2.32.0
+tqdm>=4.67.0
 numpy>=1.26.0
 pandas>=2.2.0
 
 # --- LLM APIs ---
-anthropic>=0.84.0         # Claude
-google-genai>=1.0.0       # Gemini 
-openai>=1.60.0            # DeepSeek 
-reka-api>=2.1.0           # Reka AI 
+anthropic>=0.84.0          # Claude        -- valid (latest: 0.86.0)
+google-genai>=1.0.0        # Gemini        -- valid (latest: 1.68.0)
+openai>=1.60.0,<2.0.0      # DeepSeek      -- capped: v2.0 dropped Sep 2025 with breaking API changes
+reka-api>=2.0.0            # Reka AI       -- valid (latest: 2.0.0)
 
 # --- Hugging Face & Local Inference ---
-huggingface-hub>=1.6.0    
-tokenizers>=0.21.0        
+huggingface-hub>=1.6.0     # valid (latest: 1.8.0)
+tokenizers>=0.21.0         # valid (latest: 0.22.2)
 
-# --- Unified API interface ---
-litellm>=1.60.0
+# --- Unified API Interface ---
+litellm>=1.60.0            # valid (latest: 1.65.4)
 
 # --- Local Inference (GPU required) ---
-#Galdetu Joseri vllminstalatuta dagoen ala ez eta nola egin.
+vllm>=0.11.0                #
