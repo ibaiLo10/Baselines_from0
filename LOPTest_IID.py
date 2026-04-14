@@ -6,6 +6,7 @@ import os
 import LOPbasics
 
 if __name__ == "__main__":
+    print("s")
     np.random.seed(42)
     INSTANCE_NUM = 2
     NUM_GENERATIONS = 100
@@ -35,7 +36,7 @@ if __name__ == "__main__":
         os.makedirs("algorithms", exist_ok=True)
         for i in range(NUM_GENERATIONS):
             algorithm_id = f"algorithm_{i}"
-            code = handler.get_response(template_path="./template.py", prompt=prompt)
+            code = handler.get_response(template_path="./template.py", prompt=prompt) 
             with open(f"algorithms/{algorithm_id}.py", "w") as f:
                 f.write(code)
 
