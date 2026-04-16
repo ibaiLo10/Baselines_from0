@@ -252,21 +252,40 @@ class CodeTester:
 
         return TestResult(**queue.get_nowait())
 
-def start_vllm_server(model: str, port: int = 8000):
+def start_vllm_server(model: str, port: int = 8000, timeout_minutes: int = 15):
+    log_file = open("vllm_server.log", "w")
     process = subprocess.Popen(
         [
             "python", "-m", "vllm.entrypoints.openai.api_server",
             "--model", model,
             "--port", str(port),
         ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=log_file,
     )
-    for _ in range(60):
+
+    attempts = timeout_minutes * 2  # check every 30s
+    for i in range(attempts):
+        # Bail early if process already died
+        if process.poll() is not None:
+            log_file.flush()
+            raise RuntimeError(
+                f"vLLM server process exited with code {process.returncode}. "
+                f"Check vllm_server.log for details."
+            )
         try:
-            requests.get(f"http://localhost:{port}/health")
-            print("Server ready.")
-            return process
+            r = requests.get(f"http://localhost:{port}/v1/models", timeout=5)
+            if r.status_code == 200:
+                print("Server ready.")
+                return process
         except requests.ConnectionError:
-            time.sleep(5)
-    raise RuntimeError("vLLM server did not start in time.")
+            pass
+
+        print(f"Waiting for vLLM server... ({(i+1)*30}s / {timeout_minutes*60}s)")
+        time.sleep(30)
+
+    log_file.flush()
+    raise RuntimeError(
+        f"vLLM server did not start within {timeout_minutes} minutes. "
+        f"Check vllm_server.log for details."
+    )
