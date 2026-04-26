@@ -6,7 +6,6 @@ import os
 import LOPbasics
 
 if __name__ == "__main__":
-    print("s")
     np.random.seed(42)
     INSTANCE_NUM = 2
     NUM_GENERATIONS = 100
@@ -16,8 +15,6 @@ if __name__ == "__main__":
         "temperature": 0.8,
         "max_new_tokens": 2500
     }
-    port = 14001
-    base = f"http://localhost:{port}/v1"
 
     prompt = """
     You are an expert optimization algorithm designer. Your task is to implement an algorithm
@@ -28,43 +25,41 @@ if __name__ == "__main__":
     efficient and practical for instances of size n=100. Aim for the highest solution quality possible.
     """
 
-    server = LLMhandling.start_vllm_server(model, port)
+    # Load model once — no server needed
+    handler = LLMhandling.LLMHandler(mode='hf', model_name=model, model_args=model_args)
+
     records = []
+    os.makedirs("algorithms", exist_ok=True)
 
-    try:
-        handler = LLMhandling.LLMHandler(mode='local', model_name=model, model_args=model_args, api_base=base)
-        os.makedirs("algorithms", exist_ok=True)
-        for i in range(NUM_GENERATIONS):
-            algorithm_id = f"algorithm_{i}"
-            code = handler.get_response(template_path="./template.py", prompt=prompt) 
-            with open(f"algorithms/{algorithm_id}.py", "w") as f:
-                f.write(code)
+    for i in range(NUM_GENERATIONS):
+        algorithm_id = f"algorithm_{i}"
+        code = handler.get_response(template_path="./template.py", prompt=prompt)
+        with open(f"algorithms/{algorithm_id}.py", "w") as f:
+            f.write(code)
 
-            for j, instance in enumerate(instances):
-                tester = LLMhandling.CodeTester(instance=instance, timeout=300)
-                result = tester.test(code)
+        for j, instance in enumerate(instances):
+            tester = LLMhandling.CodeTester(instance=instance, timeout=300)
+            result = tester.test(code)
 
-                n = instance.shape[0]
-                is_valid = (
-                        result.success and
-                        isinstance(result.solution, list) and
-                        len(result.solution) == n and
-                        all(isinstance(x, (int, np.integer)) for x in result.solution) and
-                        len(set(result.solution)) == n and
-                        set(result.solution) == set(range(n))
-                )
-                fitness = LOPbasics.fitness_function(result.solution, instance) if is_valid else None
+            n = instance.shape[0]
+            is_valid = (
+                    result.success and
+                    isinstance(result.solution, list) and
+                    len(result.solution) == n and
+                    all(isinstance(x, (int, np.integer)) for x in result.solution) and
+                    len(set(result.solution)) == n and
+                    set(result.solution) == set(range(n))
+            )
+            fitness = LOPbasics.fitness_function(result.solution, instance) if is_valid else None
 
-                records.append({
-                    "algorithm_id": algorithm_id,
-                    "instance_id": j,
-                    "fitness": fitness,
-                    "success": is_valid,
-                    "error_type": result.error_type if not result.success else (
-                        None if is_valid else "invalid_solution"),
-                })
+            records.append({
+                "algorithm_id": algorithm_id,
+                "instance_id": j,
+                "fitness": fitness,
+                "success": is_valid,
+                "error_type": result.error_type if not result.success else (
+                    None if is_valid else "invalid_solution"),
+            })
 
-    finally:
-        server.terminate()
-        df = pd.DataFrame(records)
-        df.to_csv("results.csv", index=False)
+    df = pd.DataFrame(records)
+    df.to_csv("results.csv", index=False)
