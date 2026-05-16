@@ -7,10 +7,10 @@ import LOPbasics
 
 if __name__ == "__main__":
     np.random.seed(42)
-    INSTANCE_NUM = 2
+    INSTANCE_NUM = 1
     NUM_GENERATIONS = 100
     instances = [np.random.randint(0, 100, (100, 100)) for _ in range(INSTANCE_NUM)]
-    model = 'Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8'
+    model = 'Qwen/Qwen3-Coder-30B-A3B-Instruct'
     model_args = {
         "temperature": 0.8,
         "max_new_tokens": 2500
@@ -29,12 +29,12 @@ if __name__ == "__main__":
     handler = LLMhandling.LLMHandler(mode='hf', model_name=model, model_args=model_args)
 
     records = []
-    os.makedirs("algorithms", exist_ok=True)
+    os.makedirs("algorithms_iid", exist_ok=True)
 
     for i in range(NUM_GENERATIONS):
         algorithm_id = f"algorithm_{i}"
         code = handler.get_response(template_path="./template.py", prompt=prompt)
-        with open(f"algorithms/{algorithm_id}.py", "w") as f:
+        with open(f"algorithms_iid/{algorithm_id}.py", "w") as f:
             f.write(code)
 
         for j, instance in enumerate(instances):
@@ -62,4 +62,4 @@ if __name__ == "__main__":
             })
 
     df = pd.DataFrame(records)
-    df.to_csv("results.csv", index=False)
+    df.to_csv("results_iid.csv", index=False)

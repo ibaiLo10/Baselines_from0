@@ -106,20 +106,17 @@ def _load_hf_model(model_name: str, model_args: dict):
         ) from e
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float16 if device == "cuda" else torch.float32
 
     print(f"[HFHandler] Loading tokenizer: {model_name}")
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
-    print(f"[HFHandler] Loading model on {device} with dtype {dtype} ...")
+    print(f"[HFHandler] Loading model on {device} ...")
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=dtype,
-        device_map="auto" if device == "cuda" else None,
+        torch_dtype="auto",
+        device_map="auto",
         trust_remote_code=True,
     )
-    if device == "cpu":
-        model = model.to(device)
 
     model.eval()
 
@@ -132,7 +129,7 @@ def _load_hf_model(model_name: str, model_args: dict):
         ctx = torch.no_grad
         print("[HFHandler] torch.inference_mode not available, using torch.no_grad()")
 
-    return model, tokenizer, ctx, device
+    return model, tokenizer, ctx
 
 
 class LLMHandler:
@@ -195,10 +192,9 @@ class LLMHandler:
         self._hf_model = None
         self._hf_tokenizer = None
         self._hf_ctx = None
-        self._hf_device = None
 
         if mode == "hf":
-            self._hf_model, self._hf_tokenizer, self._hf_ctx, self._hf_device = \
+            self._hf_model, self._hf_tokenizer, self._hf_ctx = \
                 _load_hf_model(model_name, self.model_args)
         elif mode == "local":
             self.api_base = api_base or "http://localhost:8000/v1"
@@ -217,7 +213,6 @@ class LLMHandler:
         tokenizer = self._hf_tokenizer
         model = self._hf_model
         ctx = self._hf_ctx
-        device = self._hf_device
 
         # Build chat messages if tokenizer supports apply_chat_template
         if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template is not None:
@@ -228,7 +223,7 @@ class LLMHandler:
         else:
             input_text = prompt
 
-        inputs = tokenizer(input_text, return_tensors="pt").to(device)
+        inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
 
         max_new_tokens = self.model_args.get("max_new_tokens", 4096)
         temperature = self.model_args.get("temperature", 0.8)

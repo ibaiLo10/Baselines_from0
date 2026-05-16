@@ -14,7 +14,9 @@ reka-api>=2.0.0            # Reka AI       -- valid (latest: 2.0.0)
 # --- Hugging Face & Local Inference ---
 huggingface-hub>=1.6.0     # valid (latest: 1.8.0)
 tokenizers>=0.21.0         # valid (latest: 0.22.2)
-
+transformers>=4.51.0       # required for Qwen3 support
+accelerate>=1.0.0          # required for device_map and FP8 quantized models
+kernels                    # required for FP8 triton kernels (w8a8_fp8_matmul etc.); not needed if loading in bf16
 # --- Unified API Interface ---
 litellm>=1.60.0            # valid (latest: 1.65.4)
 
