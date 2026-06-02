@@ -13,7 +13,7 @@ if __name__ == "__main__":
     model = 'Qwen/Qwen3-Coder-30B-A3B-Instruct'
     model_args = {
         "temperature": 0.8,
-        "max_new_tokens": 2500
+        "max_new_tokens": 3000
     }
 
     prompt = """
@@ -22,7 +22,9 @@ if __name__ == "__main__":
     of rows and columns that maximizes the sum of the upper triangle of the reordered matrix.
     The matrix rows and columns are indexed 0 to n-1. The solution must be a permutation: a list
     containing each integer from 0 to n-1 exactly once. The algorithm should be computationally
-    efficient and practical for instances of size n=100. Aim for the highest solution quality possible.
+    efficient and practical for instances of size n=100. You must be creative, clssic algorithms
+    such as tabu search, simulated annealing and genetic algorithm have already been tested. The algorithm
+    must include an innovative idea.  Aim for the highest solution quality possible.
     """
 
     # Load model once — no server needed
@@ -38,7 +40,7 @@ if __name__ == "__main__":
             f.write(code)
 
         for j, instance in enumerate(instances):
-            tester = LLMhandling.CodeTester(instance=instance, timeout=300)
+            tester = LLMhandling.CodeTester(instance=instance, timeout=7200)
             result = tester.test(code)
 
             n = instance.shape[0]

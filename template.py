@@ -1,29 +1,20 @@
 """
-Import every library needed for the algorithm to be designed before
-starting to implement the code. The imports must be added in the
-specified field.
+Fill in ONLY the TODO section below. Do not change the signature, the import
+markers, the `solution` variable, or the final `return`.
+Add every import you need between the "#Imports start" / "#Imports end" markers,
+and implement every helper function/class INSIDE main().
 """
 def main(instance):
     #Imports start
-
     #Imports end
     solution = None
     """
-    ·Every helper function must be implemented inside main() function.
-    ·The return of the algorithm must be a solution to the problem, eg.:
-     a permutation for the given LOP instance.
-    ·The only thing to change is the TODO part, the rest should remain the same.
-     Including parameters and return.
-    ·The input parameter "instance" is a np.array of size nxn, n being the number of rows and columns.
+    - instance: a NumPy array of shape (n, n).
+    - Return a Python list of n DISTINCT integers: a permutation of range(n).
+      NOT a NumPy array. No duplicates, no missing indices, length exactly n.
+    - Implement all helpers inside main(). Do not print anything.
+    - Only fill the TODO; keep the rest unchanged.
     """
-    #TODO: implement the algorithm here.
-
+    #TODO: implement the algorithm here. Assign the result to `solution`.
     #END TODO
     return solution
-
-
-
-
-
-
-
