@@ -33,10 +33,11 @@ def extract_code(text: str) -> str:
 
 # --------------------------------------------------------------------------- #
 # Base prompt: instructions + STRICT contract only.
-# The code skeleton (with the trusted primitives objective() and
-# best_insertion_position() and the self-healing return) is NOT embedded here;
-# it is supplied by ./template.py, which the handler loads. The prompt below
-# references those primitives, so template.py MUST define them.
+# The code skeleton (a dynamic seed plus a self-healing return) is NOT embedded
+# here; it is supplied by ./template.py, which the handler loads. There are NO
+# evaluation primitives in the skeleton: the model only has to return a
+# permutation, and its fitness is scored externally by this loop (via
+# LOPbasics.fitness_function).
 # --------------------------------------------------------------------------- #
 BASE_PROMPT = (
     "You are an expert metaheuristic designer and algorithm engineer specializing in "
@@ -49,22 +50,26 @@ BASE_PROMPT = (
     "### Problem Definition\n"
     "Given a dense, non-symmetric n x n matrix C, find a permutation pi of {0,...,n-1} that maximizes\n"
     "  f(pi) = sum_{i<j} C[pi(i), pi(j)]\n"
-    "Key structural fact: moving element e immediately past element x flips exactly that one pair, so "
-    "f changes by C[x, e] - C[e, x]. A cumulative sum over the other elements therefore gives e's best "
-    "insertion position in O(n). Exploit this; it is already implemented for you in the skeleton.\n\n"
+    "Useful structural fact you can exploit: moving element e immediately past element x flips exactly "
+    "that one pair, so f changes by C[x, e] - C[e, x]. A cumulative sum over the other elements "
+    "therefore yields e's best insertion position in O(n) -- a strong basis for fast moves if you "
+    "choose to implement one.\n\n"
+
+    "### Evaluation is external -- you do NOT implement it\n"
+    "You do NOT need to implement, call, or return any objective/fitness function: the quality of your "
+    "permutation is scored OUTSIDE this code by the optimization loop. There are NO pre-provided "
+    "helpers or primitives in the skeleton. Your single deliverable is a valid permutation (see the "
+    "contract below). If your search benefits from comparing candidate solutions internally, you are "
+    "free to implement that yourself -- but define every helper INSIDE main().\n\n"
 
     "### Instance & Performance Target\n"
-    "- Scale: n = 100. Time budget: return within ~15s wall-clock; track time.time() and stop early.\n"
-    "- Aim to complete thousands of neighborhood sweeps, not a handful. Near-optimal quality.\n\n"
-
-    "### Use the provided primitives (do NOT reimplement evaluation)\n"
-    "The skeleton already defines, and you MUST build on:\n"
-    "  - objective(perm): exact vectorized O(n^2) objective. Use ONLY for accept/compare decisions, "
-    "never inside an inner neighborhood loop.\n"
-    "  - best_insertion_position(rest, e): exact O(n) best gap + contribution for inserting element e "
-    "into partial permutation `rest`. This is your fast move evaluator.\n"
-    "Do NOT write your own delta/incremental evaluator and do NOT recompute the full objective inside "
-    "neighborhood scans. Reinventing delta-evaluation is the dominant source of index bugs.\n\n"
+    "- Scale: n = 100.\n"
+    "- Time budget: 10 minutes is the HARD MAXIMUM allowed wall-clock, NOT a duration you must fill. "
+    "Track time.time() and you MUST return before it elapses. You may keep improving the solution "
+    "while time remains and it keeps helping; once the search has converged, return early -- there is "
+    "no benefit to running out the clock, and never pad or sleep to reach the limit.\n"
+    "- Aim for near-optimal quality: fast individual moves let you run many sweeps when they keep "
+    "helping, but stop once they no longer do.\n\n"
 
     "### Innovation & Constraints\n"
     "- No textbook Tabu Search / Simulated Annealing / vanilla GA. Add a genuine structural idea on TOP "
@@ -83,7 +88,7 @@ BASE_PROMPT = (
 
     "### Code rules\n"
     "- Fill ONLY the TODO of the provided skeleton. Keep the def main signature, the import markers, the "
-    "TRUSTED PRIMITIVES, and the SELF-HEALING RETURN exactly as given -- do not modify or delete them.\n"
+    "dynamic seed, and the SELF-HEALING RETURN exactly as given -- do not modify or delete them.\n"
     "- Define every one of your own helpers INSIDE main, and define each BEFORE it is called.\n"
     "- `solution` is pre-initialized to a valid permutation; keep it valid at all times so an early "
     "time-out still returns something legal.\n"
@@ -117,9 +122,10 @@ def decide_mode(records, instance_num, last_gen_valid, have_valid_base, patience
     if not have_valid_base:
         return "COLD_START", (
             "MODE = COLD_START. No valid implementation exists yet. Do NOT innovate. Produce the "
-            "SIMPLEST correct algorithm: repeated best-insertion local search using "
-            "best_insertion_position() (sweep every element to its best gap until no improvement), "
-            "restarting from random orders while time remains. Priority #1 is a VALID return."
+            "SIMPLEST correct algorithm: a repeated best-insertion local search (for each element, "
+            "evaluate moving it to every gap and keep the best move; sweep until no improvement), "
+            "restarting from random orders while time remains. Implement the move evaluation yourself. "
+            "Priority #1 is a VALID permutation return."
         )
 
     if not last_gen_valid:
@@ -128,7 +134,7 @@ def decide_mode(records, instance_num, last_gen_valid, have_valid_base, patience
         return "REPAIR", (
             f"MODE = REPAIR. Your most recent attempt FAILED ({et}{snippet}). Start from the "
             "known-valid base below and make the MINIMAL change needed to fix the fault. Add NO new "
-            "ideas this round. Do not touch the trusted primitives or the self-healing return."
+            "ideas this round. Do not touch the dynamic seed or the self-healing return."
         )
 
     hist = _gen_fitness_history(records, instance_num)
@@ -137,7 +143,7 @@ def decide_mode(records, instance_num, last_gen_valid, have_valid_base, patience
         return "INTENSIFY", (
             "MODE = INTENSIFY. Keep the working core unchanged. Make a small, targeted refinement "
             "(tune acceptance, deepen the neighborhood, or improve the perturbation). Do NOT rewrite "
-            "the core or the primitives."
+            "the working core."
         )
 
     best_before = max(valid_fits[:-patience])
@@ -147,11 +153,11 @@ def decide_mode(records, instance_num, last_gen_valid, have_valid_base, patience
             f"MODE = EXPLORE. Fitness has plateaued over the last {patience} valid generations. "
             "Introduce exactly ONE bold structural change (a new operator, neighborhood, or "
             "metaheuristic layer) on top of the base below. If it underperforms we revert to this "
-            "base, so you risk nothing -- but KEEP the trusted primitives and the return contract intact."
+            "base, so you risk nothing -- but KEEP the self-healing return and the output contract intact."
         )
     return "INTENSIFY", (
         "MODE = INTENSIFY. Fitness is still improving. Keep the working core and refine it with a "
-        "small, targeted change. Do NOT rewrite the core or the primitives."
+        "small, targeted change. Do NOT rewrite the working core."
     )
 
 
@@ -163,15 +169,17 @@ def generate_feedback_hints(records, instance_num):
     if not failures:
         return (
             "- The current strategy is valid and stable. Improve QUALITY only: deepen the insertion "
-            "neighborhood, add path-relinking or an oscillating acceptance rule, and spend the full "
-            "budget intensifying around the incumbent. Use the provided primitives for all evaluation."
+            "neighborhood, add path-relinking or an oscillating acceptance rule, and intensify around "
+            "the incumbent -- but stop once it stops improving (the time budget is a ceiling, not a "
+            "quota). All evaluation is your own; nothing is pre-provided."
         )
 
     types = {r.get("error_type") or "unknown" for r in failures}
     errs = " ".join(str(r.get("error")) for r in failures if r.get("error"))
     hints = [
-        "- Use objective() and best_insertion_position() for ALL evaluation. Do NOT hand-write a delta "
-        "evaluator or recompute fitness in neighborhood loops -- that is the main source of these faults."
+        "- Implement your own evaluation/move logic and reuse it consistently; a mismatch between the "
+        "score you optimize and the permutation you actually return is a common source of these faults. "
+        "Validate that every move keeps a full permutation of range(n)."
     ]
 
     if types & {"compile", "no_result", "empty"}:
@@ -187,8 +195,9 @@ def generate_feedback_hints(records, instance_num):
         )
     if "timeout" in types:
         hints.append(
-            "- CRITICAL: TIMED OUT. Respect MAX_TIME via time.time(); rely on the O(n) "
-            "best_insertion_position primitive instead of any O(n^2) recompute inside loops."
+            "- CRITICAL: TIMED OUT. Respect the time budget via time.time() and return BEFORE it "
+            "elapses (it is a hard ceiling). Use an O(n) incremental move evaluation you implement "
+            "instead of recomputing the full O(n^2) objective inside inner loops."
         )
     if "runtime" in types:
         sub = []
@@ -239,40 +248,170 @@ def summarize_results(records, instance_num):
 
 
 # --------------------------------------------------------------------------- #
-# Prompt construction (state-aware: cold-start / repair / intensify / explore)
-# Full previous solution is injected uncapped (H100 has ample context budget).
+# Reference-code selection for the feedback prompt
+#
+# We feed the model up to THREE prior versions, each accompanied by its
+# per-instance fitness on the SAME benchmark instances:
+#   1) PREVIOUS    -> the immediately preceding generation,
+#   2) LAST VALID  -> the most recent generation that returned a valid solution,
+#   3) BEST        -> the best generation so far (most valid instances, then
+#                     highest mean fitness over the instances).
+#
+# For speed / context economy we NEVER show the same code twice: roles that map
+# to the same generation (or to byte-identical code) are collapsed into a single
+# block. Consequences of this rule:
+#   - If the previous run was VALID it already IS the last-valid one, so PREVIOUS
+#     and LAST VALID collapse (and BEST too if it is that same generation).
+#   - All THREE distinct blocks appear only when the previous run FAILED (so it
+#     differs from the last-valid one) AND the best so far is an older version
+#     than the last-valid one (so best != last-valid).
 # --------------------------------------------------------------------------- #
-def get_prompt(i, base_prompt, records, instance_num, code, last_valid_code=None):
+ROLE_LABELS = {
+    "previous": "PREVIOUS attempt (immediately preceding generation)",
+    "last_valid": "LAST VALID implementation",
+    "best": "BEST-so-far implementation",
+}
+
+
+def _per_generation_stats(records, instance_num, code_by_id):
+    """One dict per finished generation: id, code, validity, per-instance fitness, aggregate."""
+    gens = []
+    num_gens = len(records) // instance_num
+    for g in range(num_gens):
+        block = records[g * instance_num:(g + 1) * instance_num]
+        algorithm_id = f"algorithm_{g}"
+        valid = any(r["success"] for r in block)
+        fitnesses = [r["fitness"] for r in block]
+        valid_fits = [f for f in fitnesses if f is not None]
+        agg = float(np.mean(valid_fits)) if valid_fits else None
+        error_type, error = None, None
+        for r in block:
+            if not r["success"]:
+                error_type = r.get("error_type") or "unknown"
+                error = r.get("error") or ""
+                break
+        gens.append({
+            "id": algorithm_id,
+            "code": code_by_id.get(algorithm_id, ""),
+            "valid": valid,
+            "fitnesses": fitnesses,
+            "agg": agg,
+            "error_type": error_type,
+            "error": error,
+        })
+    return gens
+
+
+def _gen_rank_key(g):
+    """Rank generations: prefer more valid instances, then higher mean fitness."""
+    valid = [f for f in g["fitnesses"] if f is not None]
+    return (len(valid), float(np.mean(valid)) if valid else float("-inf"))
+
+
+def select_feedback_codes(records, instance_num, code_by_id):
+    """Pick previous / last-valid / best generations, collapsing duplicates by id or code."""
+    gens = _per_generation_stats(records, instance_num, code_by_id)
+    if not gens:
+        return []
+
+    previous = gens[-1]
+    last_valid = next((g for g in reversed(gens) if g["valid"]), None)
+    valid_gens = [g for g in gens if g["valid"]]
+    best = max(valid_gens, key=_gen_rank_key) if valid_gens else None
+
+    # Priority order: previous first, then last-valid, then best.
+    candidates = [("previous", previous)]
+    if last_valid is not None:
+        candidates.append(("last_valid", last_valid))
+    if best is not None:
+        candidates.append(("best", best))
+
+    # Collapse roles that point to the same generation (or to identical code) so
+    # we transmit at most three DISTINCT code blocks.
+    blocks = []
+    for role, g in candidates:
+        match = next(
+            (b for b in blocks if b["gen"]["id"] == g["id"] or b["gen"]["code"] == g["code"]),
+            None,
+        )
+        if match is not None:
+            match["roles"].append(role)
+        else:
+            blocks.append({"roles": [role], "gen": g})
+    return blocks
+
+
+def _fmt_fitnesses(fitnesses):
+    """Render a per-instance fitness vector, e.g. '[12345.0, FAIL, 12410.0]  (mean 12377.5)'."""
+    cells = ["{:.1f}".format(f) if f is not None else "FAIL" for f in fitnesses]
+    valid = [f for f in fitnesses if f is not None]
+    mean = "{:.1f}".format(float(np.mean(valid))) if valid else "n/a"
+    return "[" + ", ".join(cells) + "]  (mean " + mean + ")"
+
+
+def build_reference_section(records, instance_num, code_by_id):
+    """Assemble the de-duplicated reference-implementation block (code + fitness) for the prompt."""
+    blocks = select_feedback_codes(records, instance_num, code_by_id)
+    if not blocks:
+        return ""
+
+    parts = [
+        f"**Reference implementations ({len(blocks)} shown; identical versions collapsed):**\n"
+        "Each block is a prior version followed by its fitness on the SAME "
+        f"{instance_num} benchmark instances. Study ALL of them together -- the previous attempt, the "
+        "last valid one, and the best so far -- and use them as the basis to produce a NEW "
+        "implementation that improves on the best fitness shown. Keep what works in the strongest "
+        "version and change what is holding it back."
+    ]
+    for idx, b in enumerate(blocks, 1):
+        g = b["gen"]
+        roles = " = ".join(ROLE_LABELS[r] for r in b["roles"])
+        if g["valid"]:
+            perf = "Fitness per instance: " + _fmt_fitnesses(g["fitnesses"])
+        else:
+            snippet = (": " + g["error"][:160]) if g["error"] else ""
+            perf = f"Result: FAILED ({g['error_type'] or 'unknown'}{snippet})"
+        parts.append(
+            f"--- Reference {idx} | {roles} | [{g['id']}] ---\n"
+            f"{perf}\n"
+            f"```python\n{g['code']}\n```"
+        )
+    return "\n\n".join(parts) + "\n"
+
+
+# --------------------------------------------------------------------------- #
+# Prompt construction (state-aware: cold-start / repair / intensify / explore)
+# Up to three previous solutions (previous / last-valid / best) are injected,
+# each with its per-instance fitness, deduplicated (H100 has ample context).
+# --------------------------------------------------------------------------- #
+def get_prompt(i, base_prompt, records, instance_num, code_by_id):
     if i == 0:
         return base_prompt
 
     summary = summarize_results(records, instance_num)
     feedback_hints = generate_feedback_hints(records, instance_num)
     last_gen_valid = any(r["success"] for r in records[-instance_num:])
-    have_valid_base = last_valid_code is not None
+    have_valid_base = any(r["success"] for r in records)
 
     mode, mode_directive = decide_mode(
         records, instance_num, last_gen_valid, have_valid_base
     )
 
-    if have_valid_base:
-        shown_code = last_valid_code
-        shown_label = "Best Known-Valid Implementation"
-    else:
-        shown_code = code or ""
-        shown_label = "Your Previous (Invalid) Attempt"
+    reference_section = build_reference_section(records, instance_num, code_by_id)
 
     prompt = (
         f"{base_prompt}\n\n"
         f"=== ITERATION {i} FEEDBACK LOOP ===\n"
         f"You are inside an iterative optimization loop; your previous code was executed and analyzed.\n\n"
-        f"**Performance on {instance_num} benchmark instance(s):**\n{summary}\n\n"
+        f"**Performance of the most recent generation on {instance_num} benchmark instance(s):**\n{summary}\n\n"
         f"**{mode_directive}**\n\n"
         f"**Strategic guidance:**\n{feedback_hints}\n\n"
-        f"**{shown_label}:**\n```python\n{shown_code}\n```\n\n"
-        f"Produce the next implementation following the MODE above. Obey the strict output contract: "
-        f"EXACTLY ONE python code block defining main(instance) that returns a permutation of range(n); "
-        f"keep the trusted primitives and self-healing return unchanged; no prose."
+        f"{reference_section}\n"
+        f"Using the reference implementations above as your basis, produce the next implementation "
+        f"following the MODE above and aim to BEAT the best fitness shown. Obey the strict output "
+        f"contract: EXACTLY ONE python code block defining main(instance) that returns a permutation "
+        f"of range(n); evaluation is external, so do not compute or return any score; keep the dynamic "
+        f"seed and self-healing return unchanged; no prose."
     )
     return prompt
 
@@ -296,9 +435,9 @@ def is_valid_solution(solution, success, n):
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     np.random.seed(42)
-    INSTANCE_NUM = 1
+    INSTANCE_NUM = 5
     NUM_GENERATIONS = 100
-    TIMEOUT_SECONDS = 7200  # safety margin above the ~15s budget stated in the prompt
+    TIMEOUT_SECONDS = 900  # hard kill per instance: safety margin above the 600s (10-min) ceiling
 
     instances = [np.random.randint(0, 100, (100, 100)) for _ in range(INSTANCE_NUM)]
     model = "Qwen/Qwen3-Coder-30B-A3B-Instruct"
@@ -313,7 +452,11 @@ if __name__ == "__main__":
     records = []
     os.makedirs("algorithms", exist_ok=True)
     code = None
-    last_valid_code = None  # no seed; until first valid solution, decide_mode uses COLD_START
+    # algorithm_id -> code. Lets the prompt cite the previous / last-valid / best
+    # implementations without re-reading them from disk. `records` stays the
+    # single source of truth for fitness/validity; until the first valid solution
+    # exists, decide_mode falls back to COLD_START.
+    code_by_id = {}
 
     for i in range(NUM_GENERATIONS):
         algorithm_id = f"algorithm_{i}"
@@ -327,29 +470,26 @@ if __name__ == "__main__":
                 base_prompt=BASE_PROMPT,
                 records=records,
                 instance_num=INSTANCE_NUM,
-                code=code,
-                last_valid_code=last_valid_code,
+                code_by_id=code_by_id,
             )
 
         # --- Generate and extract clean code -------------------------------
-        # The skeleton (with primitives + self-healing return) comes from template.py.
+        # The skeleton (dynamic seed + self-healing return, NO evaluation
+        # primitives) comes from template.py.
         raw = handler.get_response(template_path="./template.py", prompt=prompt)
         code = extract_code(raw)  # clean code from here on (no prose, no fences)
+        code_by_id[algorithm_id] = code
 
         with open(f"algorithms/{algorithm_id}.py", "w") as f:
             f.write(code)
 
-        # --- Evaluate -------------------------------------------------------
-        gen_valid = False
+        # --- Evaluate on every instance ------------------------------------
         for j, instance in enumerate(instances):
             tester = LLMhandling.CodeTester(instance=instance, timeout=TIMEOUT_SECONDS)
             result = tester.test(code)
 
             n = instance.shape[0]
             is_valid = is_valid_solution(result.solution, result.success, n)
-            if is_valid:
-                gen_valid = True
-
             fitness = LOPbasics.fitness_function(result.solution, instance) if is_valid else None
 
             records.append({
@@ -362,11 +502,6 @@ if __name__ == "__main__":
                 ),
                 "error": result.error if not result.success else None,
             })
-
-        # Keep the last code that produced a valid solution so a failed
-        # generation never poisons the next prompt.
-        if gen_valid:
-            last_valid_code = code
 
         # --- Free GPU memory between LLM calls ------------------------------
         if torch.cuda.is_available():
